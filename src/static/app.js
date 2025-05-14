@@ -10,18 +10,56 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
+      // Get filter, sort, and search values
+      const categoryFilter = document.getElementById("category-filter").value;
+      const sortBy = document.getElementById("sort-by").value;
+      const searchQuery = document.getElementById("search").value.toLowerCase();
+
+      // Get unique categories for filter dropdown
+      const categorySelect = document.getElementById("category-filter");
+      const categories = Array.from(new Set(Object.values(activities).map(a => a.category)));
+      // Only populate if not already populated
+      if (categorySelect.options.length <= 1) {
+        categories.forEach(cat => {
+          const opt = document.createElement("option");
+          opt.value = cat;
+          opt.textContent = cat;
+          categorySelect.appendChild(opt);
+        });
+      }
+
+      // Convert activities to array for filtering/sorting
+      let activityArr = Object.entries(activities).map(([name, details]) => ({ name, ...details }));
+
+      // Filter by category
+      if (categoryFilter) {
+        activityArr = activityArr.filter(a => a.category === categoryFilter);
+      }
+      // Free text search (name, description, schedule)
+      if (searchQuery) {
+        activityArr = activityArr.filter(a =>
+          a.name.toLowerCase().includes(searchQuery) ||
+          a.description.toLowerCase().includes(searchQuery) ||
+          a.schedule.toLowerCase().includes(searchQuery)
+        );
+      }
+      // Sort
+      if (sortBy === "name") {
+        activityArr.sort((a, b) => a.name.localeCompare(b.name));
+      } else if (sortBy === "time") {
+        activityArr.sort((a, b) => a.schedule.localeCompare(b.schedule));
+      }
+
       // Clear loading message
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
-      Object.entries(activities).forEach(([name, details]) => {
+      activityArr.forEach(details => {
+        const name = details.name;
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
-
-        const spotsLeft =
-          details.max_participants - details.participants.length;
-
-        // Create participants HTML with delete icons instead of bullet points
+        const spotsLeft = details.max_participants - details.participants.length;
         const participantsHTML =
           details.participants.length > 0
             ? `<div class="participants-section">
@@ -36,19 +74,17 @@ document.addEventListener("DOMContentLoaded", () => {
               </ul>
             </div>`
             : `<p><em>No participants yet</em></p>`;
-
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
+          <p><strong>Category:</strong> ${details.category}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
           <div class="participants-container">
             ${participantsHTML}
           </div>
         `;
-
         activitiesList.appendChild(activityCard);
-
         // Add option to select dropdown
         const option = document.createElement("option");
         option.value = name;
@@ -154,6 +190,11 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
+
+  // Add event listeners for filter, sort, and search
+  document.getElementById("category-filter").addEventListener("change", fetchActivities);
+  document.getElementById("sort-by").addEventListener("change", fetchActivities);
+  document.getElementById("search").addEventListener("input", fetchActivities);
 
   // Initialize app
   fetchActivities();
